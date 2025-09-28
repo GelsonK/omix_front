@@ -46,6 +46,5 @@ const users = caneca.define('users', {
     defaultValue: 'pendente' 
 }
 })
-users.sync({FORCE:true})
 
-//module.exports=users
+module.exports=users
