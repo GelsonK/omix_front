@@ -8,5 +8,9 @@
     "mysql2": "^3.15.1",
     "sequelize": "^6.37.7",
     "uuid": "^13.0.0"
+  },
+  "scripts": {
+    "start":"node app.js"
   }
+
 }
