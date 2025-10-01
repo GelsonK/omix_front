@@ -4,26 +4,49 @@ const cors = require("cors");
 const path = require("path");
 const users = require('./mysql');
 const { match } = require("assert");
+require('dotenv').config()
+const { v2: cloudinary } = require('cloudinary');
+
 
 const app = express();
 app.use(cors()); // permite chamadas do frontend
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads"))); // servir imagens
 
-// Configuração do Multer
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, "uploads/"); // pasta para salvar as imagens
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    },
+
+///////////////// configuracao do claudyner ...............................
+
+cloudinary.config({
+    cloud_name:process.env.CLOUD_NAME,
+    api_key:process.env.CLOUD_API_KEY,
+    api_secret:process.env.CLOUD_API_SECRET,
 });
+
+
+
+
+
+// Configuração do Multer
+// salvar em memória, não no disco
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
-
-
 // //// ///// rota para listar todos os users ..............
+
+
+
+/////// funcao para cadastrar a imagem ...............................
+
+async function uploadToCloudinary(fileBuffer) {
+    return new Promise((resolve, reject) => {
+        cloudinary.uploader
+            .upload_stream({ resource_type: "image" }, (error, result) => {
+                if (error) return reject(error);
+                resolve(result.secure_url); // retorna a URL final
+            })
+            .end(fileBuffer);
+    });
+}
+
 
 
 
@@ -75,16 +98,18 @@ app.post("/cad", upload.single("foto"), async (req, res) => {
     try {
         const { nome, data, telefone, sala, periodo, text } = req.body;
         const genero = req.body.genero || "Não informado";
-        const imagem = req.file ? `/uploads/${req.file.filename}` : null;
+
+        let imagem = null;
+        if (req.file) {
+            imagem = await uploadToCloudinary(req.file.buffer); // 🔥 envia pro Cloudinary
+        }
 
         const usados = new Set();
-
         function omix() {
             let numero;
             do {
-                numero = Math.floor(100000 + Math.random() * 900000); // garante 6 dígitos
+                numero = Math.floor(100000 + Math.random() * 900000);
             } while (usados.has(numero));
-
             usados.add(numero);
             return numero;
         }
@@ -97,15 +122,14 @@ app.post("/cad", upload.single("foto"), async (req, res) => {
             sala,
             periodo,
             text,
-            imagem,
+            imagem, // aqui já vem a URL do Cloudinary
             omix: omix(),
-            status: 'pendente'
+            status: "pendente",
         };
-
 
         console.log("📥 Dados recebidos:", dadosRecebidos);
 
-        await users.create(dadosRecebidos)
+        await users.create(dadosRecebidos);
 
         res.json({
             message: "Cadastro recebido com sucesso!",
@@ -116,6 +140,7 @@ app.post("/cad", upload.single("foto"), async (req, res) => {
         res.status(500).json({ error: "Erro no servidor" });
     }
 });
+
 
 
 
